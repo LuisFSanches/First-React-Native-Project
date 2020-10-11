@@ -1,8 +1,9 @@
 import React, {useState, useEffect} from 'react';
-import {Keyboard} from 'react-native';
+import PropTypes from 'prop-types';
+import {Keyboard, ActivityIndicator} from 'react-native';
+import AsyncStorage from '@react-native-community/async-storage';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import api from '../../services/api';
-import {View} from 'react-native';
 
 import {
   Container,
@@ -18,11 +19,27 @@ import {
   ProfileButtonText,
 } from './styles';
 
-export default function Main() {
+export default function Main({navigation}) {
   const [user, setUser] = useState('');
   const [users, setUsers] = useState([]);
+  const [loading, setLoad] = useState(false);
+
+  useEffect(() => {
+    const getData = async () => {
+      const getUsers = await AsyncStorage.getItem('users');
+      if (getUsers) {
+        setUsers(JSON.parse(getUsers));
+      }
+    };
+    getData();
+  }, []);
+
+  useEffect(() => {
+    AsyncStorage.setItem('users', JSON.stringify(users));
+  }, [users]);
 
   const onSubmit = async () => {
+    setLoad(true);
     const response = await api.get(`/users/${user}`);
     const data = {
       name: response.data.name,
@@ -32,7 +49,12 @@ export default function Main() {
     };
     setUsers([...users, data]);
     setUser('');
+    setLoad(false);
     Keyboard.dismiss();
+  };
+
+  const handleNavigate = (user) => {
+    navigation.navigate('User', {user});
   };
 
   return (
@@ -47,8 +69,12 @@ export default function Main() {
           returnKeyType="send"
           onSubmitEditing={onSubmit}
         />
-        <SubmitButton onPress={onSubmit}>
-          <Icon name="add" size={20} color="#FFF" />
+        <SubmitButton loading={loading} onPress={onSubmit}>
+          {loading ? (
+            <ActivityIndicator color="#FFF" />
+          ) : (
+            <Icon name="add" size={20} color="#FFF" />
+          )}
         </SubmitButton>
       </Form>
       <List
@@ -59,7 +85,7 @@ export default function Main() {
             <Avatar source={{uri: item.avatar}} />
             <Name>{item.name}</Name>
             <Bio>{item.bio}</Bio>
-            <ProfileButton>
+            <ProfileButton onPress={() => handleNavigate(item)}>
               <ProfileButtonText>Ver Perfil</ProfileButtonText>
             </ProfileButton>
           </User>
@@ -68,6 +94,11 @@ export default function Main() {
     </Container>
   );
 }
+Main.propTypes = {
+  navigation: PropTypes.shape({
+    navigate: PropTypes.func,
+  }).isRequired,
+};
 
 Main.navigationOptions = {
   title: 'Usuario',
